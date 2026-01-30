@@ -12,30 +12,31 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-const execute =  (command, args, input) => {
-  
-  return new Promise((resolve, reject)=>{
-      const compile = spawn(command, args);
+const execute = (command, args, input) => {
 
-  compile.stdin.write(input || "");
-  compile.stdin.end();
+  return new Promise((resolve, reject) => {
+    const compile = spawn(command, args);
 
-  let stdout = "";
-  let stderr = "";
+    compile.stdin.write(input || "");
+    compile.stdin.end();
 
-  compile.stdout.on("data", (data) => {
-    stdout += data.toString();
-  });
-  compile.stderr.on("data", (data) => {
-    stderr += data.toString();
-  });
-  
-  compile.on('close',()=>{
-    resolve({stdout,stderr})
+    let stdout = "";
+    let stderr = "";
+
+    compile.stdout.on("data", (data) => {
+      stdout += data.toString();
+    });
+    compile.stderr.on("data", (data) => {
+      stderr += data.toString();
+    });
+
+    compile.on('close', () => {
+      resolve({ stdout, stderr })
+    })
+    compile.on('error', err => {
+      reject({ stdout, stderr: err.message })
+    })
   })
-  compile.on('error',err=>{
-    reject({stdout, stderr : err.message})
-  })})
 };
 
 const handle_language = async (language, code, input) => {
@@ -44,9 +45,9 @@ const handle_language = async (language, code, input) => {
     return await execute("python3", ["main.py"], input);
   } else if (language === "cpp") {
     fs.writeFileSync("main.cpp", code);
-    
+
     const compile = await execute("g++", ["main.cpp", "-o", "main"], "");
-    if (compile.stderr) return compile; 
+    if (compile.stderr) return compile;
 
     return await execute("./main", [], input);
   } else if (language === "javascript") {
@@ -70,6 +71,10 @@ app.post("/compile/:language", async (req, res) => {
     res.status(500).json({ stdout: "", stderr: err.stderr || err.message });
   }
 });
+
+app.get("/start", (req, res) => {
+  return res.send("ok");
+})
 
 app.listen(3000, () => {
   console.log("app started in port 3000");
